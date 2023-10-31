@@ -270,7 +270,11 @@ impl<'a> AsyncObjectAPI for OSS<'a> {
             self.build_request(RequestType::Put, object_name, headers, resources)?;
 
         let path = path.as_ref().to_owned();
-        let stream = ReaderStream::new(tokio::fs::File::open(&path).await.unwrap());
+        let stream = ReaderStream::new(
+            tokio::fs::File::open(&path)
+                .await
+                .map_err(|err| Error::Io(err))?,
+        );
         // let s = tokio::fs::File::open(path.to_owned())
         //     .map_ok(|file| FramedRead::new(file, BytesCodec::new()).map_ok(BytesMut::freeze))
         //     .try_flatten_stream();
