@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use crate::{
     multi_part::{CompleteMultipartUploadResult, InitiateMultipartUploadResult},
@@ -10,6 +10,8 @@ use super::errors::{Error, ObjectError};
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use reqwest::Body;
+use tokio_util::io::ReaderStream;
 
 #[async_trait]
 pub trait AsyncObjectAPI {
@@ -39,6 +41,20 @@ pub trait AsyncObjectAPI {
         resources: R,
     ) -> Result<(), Error>
     where
+        S1: AsRef<str> + Send,
+        S2: AsRef<str> + Send,
+        H: Into<Option<HashMap<S2, S2>>> + Send,
+        R: Into<Option<HashMap<S2, Option<S2>>>> + Send;
+
+    async fn put_object_from_file<P, S1, S2, H, R>(
+        &self,
+        path: P,
+        object_name: S1,
+        headers: H,
+        resources: R,
+    ) -> Result<(), Error>
+    where
+        P: AsRef<Path> + Send,
         S1: AsRef<str> + Send,
         S2: AsRef<str> + Send,
         H: Into<Option<HashMap<S2, S2>>> + Send,
@@ -220,6 +236,50 @@ impl<'a> AsyncObjectAPI for OSS<'a> {
             .put(&host)
             .headers(headers)
             .body(buf.to_owned())
+            .send()
+            .await?;
+
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            Err(Error::Object(ObjectError::DeleteError {
+                msg: format!(
+                    "can not put object, status code, status code: {}",
+                    resp.status()
+                )
+                .into(),
+            }))
+        }
+    }
+
+    async fn put_object_from_file<P, S1, S2, H, R>(
+        &self,
+        path: P,
+        object_name: S1,
+        headers: H,
+        resources: R,
+    ) -> Result<(), Error>
+    where
+        P: AsRef<Path> + Send,
+        S1: AsRef<str> + Send,
+        S2: AsRef<str> + Send,
+        H: Into<Option<HashMap<S2, S2>>> + Send,
+        R: Into<Option<HashMap<S2, Option<S2>>>> + Send,
+    {
+        let (host, headers) =
+            self.build_request(RequestType::Put, object_name, headers, resources)?;
+
+        let path = path.as_ref().to_owned();
+        let stream = ReaderStream::new(tokio::fs::File::open(&path).await.unwrap());
+        // let s = tokio::fs::File::open(path.to_owned())
+        //     .map_ok(|file| FramedRead::new(file, BytesCodec::new()).map_ok(BytesMut::freeze))
+        //     .try_flatten_stream();
+        let body = Body::wrap_stream(stream);
+        let resp = self
+            .http_client
+            .put(&host)
+            .headers(headers)
+            .body(body)
             .send()
             .await?;
 

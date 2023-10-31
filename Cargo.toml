@@ -9,7 +9,7 @@ license = "Apache-2.0"
 repository = "https://github.com/NoXF/oss-rust-sdk"
 
 [dependencies]
-reqwest = { version = "0.11.13", features = ["blocking"], default-features = false, optional = true }
+reqwest = { version = "0.11.13", features = ["blocking", "stream"], default-features = false, optional = true }
 base64 = "0.13"
 chrono = "0.4.20"
 log = "0.4.17"
@@ -22,6 +22,8 @@ hmac = "0.12"
 sha1 = "0.10"
 serde = { version = "1.0.156", features = ["derive"] }
 urlencoding = "2.1.3"
+tokio-util = "0.7.10"
+tokio = { version = "1.1", features = ["fs"] }
 
 [dev-dependencies]
 tokio = { version = "1.1", features = ["full"] }
